@@ -1,21 +1,20 @@
 import face_recognition
-import os
+import os, sys
 import cv2
 import numpy as np
 import math
 
 
 # Helper
-# https://github.com/ageitgey/face_recognition/issues/707#issuecomment-449087829
-def face_distance_to_conf(face_distance, face_match_threshold=0.6):
+def face_confidence(face_distance, face_match_threshold=0.6):
+    range = (1.0 - face_match_threshold)
+    linear_val = (1.0 - face_distance) / (range * 2.0)
+
     if face_distance > face_match_threshold:
-        range = (1.0 - face_match_threshold)
-        linear_val = (1.0 - face_distance) / (range * 2.0)
         return str(round(linear_val * 100, 2)) + '%'
     else:
-        range = face_match_threshold
-        linear_val = 1.0 - (face_distance / (range * 2.0))
-        return str(round((linear_val + ((1.0 - linear_val) * math.pow((linear_val - 0.5) * 2, 0.2))) * 100, 2)) + '%'
+        value = (linear_val + ((1.0 - linear_val) * math.pow((linear_val - 0.5) * 2, 0.2))) * 100
+        return str(round(value, 2)) + '%'
 
 
 class FaceRecognition:
@@ -40,6 +39,9 @@ class FaceRecognition:
 
     def run_recognition(self):
         video_capture = cv2.VideoCapture(0)
+
+        if not video_capture.isOpened():
+            sys.exit('Video source not found...')
 
         while True:
             ret, frame = video_capture.read()
@@ -69,7 +71,7 @@ class FaceRecognition:
                     best_match_index = np.argmin(face_distances)
                     if matches[best_match_index]:
                         name = self.known_face_names[best_match_index]
-                        confidence = face_distance_to_conf(face_distances[best_match_index])
+                        confidence = face_confidence(face_distances[best_match_index])
 
                     self.face_names.append(f'{name} ({confidence})')
 
@@ -83,18 +85,16 @@ class FaceRecognition:
                 bottom *= 4
                 left *= 4
 
-                # Draw a box around the face
+                # Create the frame with the name
                 cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
-
-                # Draw a label with a name below the face
                 cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
                 cv2.putText(frame, name, (left + 6, bottom - 6), cv2.FONT_HERSHEY_DUPLEX, 0.8, (255, 255, 255), 1)
 
             # Display the resulting image
-            cv2.imshow('Video', frame)
+            cv2.imshow('Face Recognition', frame)
 
             # Hit 'q' on the keyboard to quit!
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            if cv2.waitKey(1) == ord('q'):
                 break
 
         # Release handle to the webcam
